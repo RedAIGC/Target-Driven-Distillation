@@ -2,136 +2,7 @@ from diffusers import TCDScheduler, DPMSolverSinglestepScheduler
 from diffusers.schedulers.scheduling_tcd import *
 from diffusers.schedulers.scheduling_dpmsolver_singlestep import *
 
-class TDDScheduler(TCDScheduler):
-    def step(
-        self,
-        model_output: torch.FloatTensor,
-        timestep: int,
-        sample: torch.FloatTensor,
-        eta: float = 0.3,
-        generator: Optional[torch.Generator] = None,
-        return_dict: bool = True,
-    ) -> Union[TCDSchedulerOutput, Tuple]:
-
-        if self.num_inference_steps is None:
-            raise ValueError(
-                "Number of inference steps is 'None', you need to run 'set_timesteps' after creating the scheduler"
-            )
-
-        if self.step_index is None:
-            self._init_step_index(timestep)
-
-        assert 0 <= eta <= 1.0, "gamma must be less than or equal to 1.0"
-
-        # 1. get previous step value
-        prev_step_index = self.step_index + 1
-        if prev_step_index < len(self.timesteps):
-            prev_timestep = self.timesteps[prev_step_index]
-        else:
-            prev_timestep = torch.tensor(0)
-
-        timestep_s = torch.floor((1 - eta) * prev_timestep).to(dtype=torch.long)
-
-        # 2. compute alphas, betas
-        alpha_prod_t = self.alphas_cumprod[timestep]
-        beta_prod_t = 1 - alpha_prod_t
-
-        alpha_prod_t_prev = self.alphas_cumprod[prev_timestep] if prev_timestep >= 0 else self.final_alpha_cumprod
-        beta_prod_t_prev = 1 - alpha_prod_t_prev
-
-        alpha_prod_s = self.alphas_cumprod[timestep_s]
-        beta_prod_s = 1 - alpha_prod_s
-
-        # 3. Compute the predicted noised sample x_s based on the model parameterization
-        # xx
-
-
-        if self.step_index == 0:
-            self.buffer = [None] * 2
-        if self.config.prediction_type == "epsilon":  # noise-prediction
-            pred_original_sample = (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt()
-            pred_epsilon = model_output
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        elif self.config.prediction_type == "ode_dpmsolver_1":
-            lambda_t = torch.log(alpha_prod_t.sqrt() / beta_prod_t.sqrt())
-            lambda_s = torch.log(alpha_prod_s.sqrt() / beta_prod_s.sqrt())
-            h_t = lambda_s -lambda_t
-            pred_noised_sample = alpha_prod_s.sqrt() / alpha_prod_t.sqrt() * sample - beta_prod_s.sqrt() * (torch.expm1(h_t)) * model_output
-        elif self.config.prediction_type == "ode_dpmsolver_2M":
-            print("222")
-            self.buffer[0] = self.buffer[1]
-            self.buffer[-1] = model_output
-            # self.buffer.append(model_output)
-            if self.step_index > 0:
-                alpha_prod_t0 = self.alphas_cumprod[self.timesteps[self.step_index - 1]]
-                beta_prod_t0 = 1 - alpha_prod_t0
-
-                lambda_t_prev = torch.log(alpha_prod_t_prev.sqrt() / beta_prod_t_prev.sqrt())
-                lambda_t = torch.log(alpha_prod_t.sqrt() / beta_prod_t.sqrt())
-                lambda_t0 =  torch.log(alpha_prod_t0.sqrt() / beta_prod_t0.sqrt())
-
-            else:
-                lambda_t_prev = torch.log(alpha_prod_t_prev.sqrt() / beta_prod_t_prev.sqrt())
-                lambda_t = torch.log(alpha_prod_t.sqrt() / beta_prod_t.sqrt())
-                lambda_t0 =  torch.log(alpha_prod_t0.sqrt() / beta_prod_t0.sqrt())
-           
-            mt, mt_prev = self.buffer[-1], self.buffer[-2]
-            h, h_0 = lambda_t_prev - lambda_t0, lambda_t - lambda_t0
-            r0 = h_0 / h
-            D0, D1 = mt_prev, (1.0 / r0) * (mt - mt_prev)
-            pred_noised_sample = (
-                alpha_prod_t_prev.sqrt() / alpha_prod_t.sqrt() * sample
-                - (alpha_prod_t_prev.sqrt() * (torch.expm1(h)) * D0)
-                - 0.5 * (alpha_prod_t_prev.sqrt() * torch.expm1(h)) * D1
-            )
-
-        elif self.config.prediction_type == "ode_dpmsolver++_1":
-            lambda_t = torch.log(alpha_prod_t.sqrt() / beta_prod_t.sqrt())
-            lambda_s = torch.log(alpha_prod_s.sqrt() / beta_prod_s.sqrt())
-            h_t = lambda_s -lambda_t
-            pred_noised_sample = beta_prod_s.sqrt() / beta_prod_t.sqrt() * sample - alpha_prod_s.sqrt() * (torch.expm1(-h_t)) * model_output
-            
-        elif self.config.prediction_type == "sample":  # x-prediction
-            pred_original_sample = model_output
-            pred_epsilon = (sample - alpha_prod_t ** (0.5) * pred_original_sample) / beta_prod_t ** (0.5)
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        elif self.config.prediction_type == "v_prediction":  # v-prediction
-            pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
-            pred_epsilon = (alpha_prod_t**0.5) * model_output + (beta_prod_t**0.5) * sample
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        else:
-            raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
-                " `v_prediction` for `TCDScheduler`."
-            )
-
-        # 4. Sample and inject noise z ~ N(0, I) for MultiStep Inference
-        # Noise is not used on the final timestep of the timestep schedule.
-        # This also means that noise is not used for one-step sampling.
-        # Eta (referred to as "gamma" in the paper) was introduced to control the stochasticity in every step.
-        # When eta = 0, it represents deterministic sampling, whereas eta = 1 indicates full stochastic sampling.
-        if eta > 0:
-            if self.step_index != self.num_inference_steps - 1:
-                noise = randn_tensor(
-                    model_output.shape, generator=generator, device=model_output.device, dtype=pred_noised_sample.dtype
-                )
-                prev_sample = (alpha_prod_t_prev / alpha_prod_s).sqrt() * pred_noised_sample + (
-                    1 - alpha_prod_t_prev / alpha_prod_s
-                ).sqrt() * noise
-            else:
-                prev_sample = pred_noised_sample
-        else:
-            prev_sample = pred_noised_sample
-
-        # upon completion increase step index by one
-        self._step_index += 1
-
-        if not return_dict:
-            return (prev_sample, pred_noised_sample)
-
-        return TCDSchedulerOutput(prev_sample=prev_sample, pred_noised_sample=pred_noised_sample)
-
-class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
+class TDDScheduler(DPMSolverSinglestepScheduler):
     @register_to_config
     def __init__(
         self,
@@ -140,7 +11,7 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
         trained_betas: Optional[np.ndarray] = None,
-        solver_order: int = 2,
+        solver_order: int = 1,
         prediction_type: str = "epsilon",
         thresholding: bool = False,
         dynamic_thresholding_ratio: float = 0.995,
@@ -152,8 +23,12 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
         final_sigmas_type: Optional[str] = "zero",  # "zero", "sigma_min"
         lambda_min_clipped: float = -float("inf"),
         variance_type: Optional[str] = None,
-        tdd_train_step: int = 50,
+        tdd_train_step: int = 250,
+        special_jump: bool = False,
+        t_l: int = -1
     ):
+        self.t_l = t_l
+        self.special_jump = special_jump
         self.tdd_train_step = tdd_train_step
         if algorithm_type == "dpmsolver":
             deprecation_message = "algorithm_type `dpmsolver` is deprecated and will be removed in a future version. Choose from `dpmsolver++` or `sde-dpmsolver++` instead"
@@ -228,18 +103,20 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
         inference_indices = np.linspace(0, len(tcd_origin_timesteps), num=num_inference_steps, endpoint=False)
         inference_indices = np.floor(inference_indices).astype(np.int64)
         timesteps = tcd_origin_timesteps[inference_indices]
-            
-        # clipped_idx = torch.searchsorted(torch.flip(self.lambda_t, [0]), self.config.lambda_min_clipped)
-        # timesteps = (
-        #     np.linspace(0, self.config.num_train_timesteps - 1 - clipped_idx, num_inference_steps + 1)
-        #     .round()[::-1][:-1]
-        #     .copy()
-        #     .astype(np.int64)
-        # )
+        if self.special_jump:
+            if self.tdd_train_step == 50:
+                #timesteps = np.array([999., 879., 759., 499., 259.])
+                print(timesteps)
+            elif self.tdd_train_step == 250:
+                if num_inference_steps == 5:
+                    timesteps = np.array([999., 875., 751., 499., 251.])
+                elif num_inference_steps == 6:
+                    timesteps = np.array([999., 875., 751., 627., 499., 251.])
+                elif num_inference_steps == 7:
+                    timesteps = np.array([999., 875., 751., 627., 499., 375., 251.])
 
         sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         if self.config.use_karras_sigmas:
-            print("WWWwWWWWWwWW")
             log_sigmas = np.log(sigmas)
             sigmas = np.flip(sigmas).copy()
             sigmas = self._convert_to_karras(in_sigmas=sigmas, num_inference_steps=num_inference_steps)
@@ -299,13 +176,17 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
         inference_indices = np.linspace(0, len(tcd_origin_timesteps), num=num_inference_steps, endpoint=False)
         inference_indices = np.floor(inference_indices).astype(np.int64)
         timesteps = tcd_origin_timesteps[inference_indices]
-        #clipped_idx = torch.searchsorted(torch.flip(self.lambda_t, [0]), self.config.lambda_min_clipped)
-        # timesteps = (
-        #     np.linspace(0, self.config.num_train_timesteps - 1 - clipped_idx, num_inference_steps + 1)
-        #     .round()[::-1][:-1]
-        #     .copy()
-        #     .astype(np.int64)
-        # )
+        if self.special_jump:
+            if self.tdd_train_step == 50:
+                timesteps = np.array([999., 879., 759., 499., 259.])
+            elif self.tdd_train_step == 250:
+                if num_inference_steps == 5:
+                    timesteps = np.array([999., 875., 751., 499., 251.])
+                elif num_inference_steps == 6:
+                    timesteps = np.array([999., 875., 751., 627., 499., 251.])
+                elif num_inference_steps == 7:
+                    timesteps = np.array([999., 875., 751., 627., 499., 375., 251.])
+
         timesteps_s = np.floor((1 - eta) * timesteps).astype(np.int64)
 
         sigmas_s = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
@@ -502,111 +383,6 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
                 )
         return x_t
 
-    def singlestep_dpm_solver_third_order_update(
-        self,
-        model_output_list: List[torch.FloatTensor],
-        *args,
-        sample: torch.FloatTensor = None,
-        **kwargs,
-    ) -> torch.FloatTensor:
-        """
-        One step for the third-order singlestep DPMSolver that computes the solution at time `prev_timestep` from the
-        time `timestep_list[-3]`.
-
-        Args:
-            model_output_list (`List[torch.FloatTensor]`):
-                The direct outputs from learned diffusion model at current and latter timesteps.
-            timestep (`int`):
-                The current and latter discrete timestep in the diffusion chain.
-            prev_timestep (`int`):
-                The previous discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
-                A current instance of a sample created by diffusion process.
-
-        Returns:
-            `torch.FloatTensor`:
-                The sample tensor at the previous timestep.
-        """
-
-        timestep_list = args[0] if len(args) > 0 else kwargs.pop("timestep_list", None)
-        prev_timestep = args[1] if len(args) > 1 else kwargs.pop("prev_timestep", None)
-        if sample is None:
-            if len(args) > 2:
-                sample = args[2]
-            else:
-                raise ValueError(" missing`sample` as a required keyward argument")
-        if timestep_list is not None:
-            deprecate(
-                "timestep_list",
-                "1.0.0",
-                "Passing `timestep_list` is deprecated and has no effect as model output conversion is now handled via an internal counter `self.step_index`",
-            )
-
-        if prev_timestep is not None:
-            deprecate(
-                "prev_timestep",
-                "1.0.0",
-                "Passing `prev_timestep` is deprecated and has no effect as model output conversion is now handled via an internal counter `self.step_index`",
-            )
-
-        sigma_t, sigma_s0, sigma_s1, sigma_s2 = (
-            self.sigmas[self.step_index + 1],
-            self.sigmas[self.step_index],
-            self.sigmas[self.step_index - 1],
-            self.sigmas[self.step_index - 2],
-        )
-
-        alpha_t, sigma_t = self._sigma_to_alpha_sigma_t(sigma_t)
-        alpha_s0, sigma_s0 = self._sigma_to_alpha_sigma_t(sigma_s0)
-        alpha_s1, sigma_s1 = self._sigma_to_alpha_sigma_t(sigma_s1)
-        alpha_s2, sigma_s2 = self._sigma_to_alpha_sigma_t(sigma_s2)
-
-        lambda_t = torch.log(alpha_t) - torch.log(sigma_t)
-        lambda_s0 = torch.log(alpha_s0) - torch.log(sigma_s0)
-        lambda_s1 = torch.log(alpha_s1) - torch.log(sigma_s1)
-        lambda_s2 = torch.log(alpha_s2) - torch.log(sigma_s2)
-
-        m0, m1, m2 = model_output_list[-1], model_output_list[-2], model_output_list[-3]
-
-        h, h_0, h_1 = lambda_t - lambda_s2, lambda_s0 - lambda_s2, lambda_s1 - lambda_s2
-        r0, r1 = h_0 / h, h_1 / h
-        D0 = m2
-        D1_0, D1_1 = (1.0 / r1) * (m1 - m2), (1.0 / r0) * (m0 - m2)
-        D1 = (r0 * D1_0 - r1 * D1_1) / (r0 - r1)
-        D2 = 2.0 * (D1_1 - D1_0) / (r0 - r1)
-        if self.config.algorithm_type == "dpmsolver++":
-            # See https://arxiv.org/abs/2206.00927 for detailed derivations
-            if self.config.solver_type == "midpoint":
-                x_t = (
-                    (sigma_t / sigma_s2) * sample
-                    - (alpha_t * (torch.exp(-h) - 1.0)) * D0
-                    + (alpha_t * ((torch.exp(-h) - 1.0) / h + 1.0)) * D1_1
-                )
-            elif self.config.solver_type == "heun":
-                x_t = (
-                    (sigma_t / sigma_s2) * sample
-                    - (alpha_t * (torch.exp(-h) - 1.0)) * D0
-                    + (alpha_t * ((torch.exp(-h) - 1.0) / h + 1.0)) * D1
-                    - (alpha_t * ((torch.exp(-h) - 1.0 + h) / h**2 - 0.5)) * D2
-                )
-        elif self.config.algorithm_type == "dpmsolver":
-            # See https://arxiv.org/abs/2206.00927 for detailed derivations
-            if self.config.solver_type == "midpoint":
-                x_t = (
-                    (alpha_t / alpha_s2) * sample
-                    - (sigma_t * (torch.exp(h) - 1.0)) * D0
-                    - (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1_1
-                )
-            elif self.config.solver_type == "heun":
-                x_t = (
-                    (alpha_t / alpha_s2) * sample
-                    - (sigma_t * (torch.exp(h) - 1.0)) * D0
-                    - (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1
-                    - (sigma_t * ((torch.exp(h) - 1.0 - h) / h**2 - 0.5)) * D2
-                )
-        return x_t
-
-
     def singlestep_dpm_solver_update(
         self,
         model_output_list: List[torch.FloatTensor],
@@ -645,10 +421,8 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
             return self.dpm_solver_first_order_update(model_output_list[-1], sample=sample)
         elif order == 2:
             return self.singlestep_dpm_solver_second_order_update(model_output_list, sample=sample)
-        elif order == 3:
-            return self.singlestep_dpm_solver_third_order_update(model_output_list, sample=sample)
         else:
-            raise ValueError(f"Order must be 1, 2, 3, got {order}")
+            raise ValueError(f"Order must be 1, 2, got {order}")
 
     def convert_model_output(
         self,
@@ -712,7 +486,7 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
                     " `v_prediction` for the DPMSolverSinglestepScheduler."
                 )
 
-            if self.step_index == 0:
+            if self.step_index <= self.t_l:
                 if self.config.thresholding:
                     x0_pred = self._threshold_sample(x0_pred)
 
@@ -739,87 +513,3 @@ class TDDSchedulerPlus(DPMSolverSinglestepScheduler):
                     f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample`, or"
                     " `v_prediction` for the DPMSolverSinglestepScheduler."
                 )
-
-
-class TDDSchedulerTest(TCDScheduler):
-    def step(
-        self,
-        model_output: torch.FloatTensor,
-        timestep: int,
-        sample: torch.FloatTensor,
-        eta: float = 0.3,
-        generator: Optional[torch.Generator] = None,
-        return_dict: bool = True,
-    ) -> Union[TCDSchedulerOutput, Tuple]:
-        if self.num_inference_steps is None:
-            raise ValueError(
-                "Number of inference steps is 'None', you need to run 'set_timesteps' after creating the scheduler"
-            )
-
-        if self.step_index is None:
-            self._init_step_index(timestep)
-
-        assert 0 <= eta <= 1.0, "gamma must be less than or equal to 1.0"
-
-        # 1. get previous step value
-        prev_step_index = self.step_index + 1
-        if prev_step_index < len(self.timesteps):
-            prev_timestep = self.timesteps[prev_step_index]
-        else:
-            prev_timestep = torch.tensor(0)
-
-        timestep_s = torch.floor((1 - eta) * prev_timestep).to(dtype=torch.long)
-
-        # 2. compute alphas, betas
-        alpha_prod_t = self.alphas_cumprod[timestep]
-        beta_prod_t = 1 - alpha_prod_t
-
-        alpha_prod_t_prev = self.alphas_cumprod[prev_timestep] if prev_timestep >= 0 else self.final_alpha_cumprod
-
-        alpha_prod_s = self.alphas_cumprod[timestep_s]
-        beta_prod_s = 1 - alpha_prod_s
-
-        # 3. Compute the predicted noised sample x_s based on the model parameterization
-        if self.config.prediction_type == "epsilon":  # noise-prediction
-            pred_original_sample = (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt()
-            pred_epsilon = model_output
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        elif self.config.prediction_type == "sample":  # x-prediction
-            pred_original_sample = model_output
-            pred_epsilon = (sample - alpha_prod_t ** (0.5) * pred_original_sample) / beta_prod_t ** (0.5)
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        elif self.config.prediction_type == "v_prediction":  # v-prediction
-            pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
-            pred_epsilon = (alpha_prod_t**0.5) * model_output + (beta_prod_t**0.5) * sample
-            pred_noised_sample = alpha_prod_s.sqrt() * pred_original_sample + beta_prod_s.sqrt() * pred_epsilon
-        else:
-            raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
-                " `v_prediction` for `TCDScheduler`."
-            )
-
-        # 4. Sample and inject noise z ~ N(0, I) for MultiStep Inference
-        # Noise is not used on the final timestep of the timestep schedule.
-        # This also means that noise is not used for one-step sampling.
-        # Eta (referred to as "gamma" in the paper) was introduced to control the stochasticity in every step.
-        # When eta = 0, it represents deterministic sampling, whereas eta = 1 indicates full stochastic sampling.
-        if eta > 0:
-            if self.step_index != self.num_inference_steps - 1:
-                noise = randn_tensor(
-                    model_output.shape, generator=generator, device=model_output.device, dtype=pred_noised_sample.dtype
-                )
-                prev_sample = (alpha_prod_t_prev / alpha_prod_s).sqrt() * pred_noised_sample + (
-                    1 - alpha_prod_t_prev / alpha_prod_s
-                ).sqrt() * noise
-            else:
-                prev_sample = pred_noised_sample
-        else:
-            prev_sample = pred_noised_sample
-
-        # upon completion increase step index by one
-        self._step_index += 1
-
-        if not return_dict:
-            return (prev_sample, pred_noised_sample)
-
-        return TCDSchedulerOutput(prev_sample=prev_sample, pred_noised_sample=pred_noised_sample)
