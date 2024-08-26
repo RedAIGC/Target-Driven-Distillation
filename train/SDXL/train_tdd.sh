@@ -28,6 +28,3 @@ accelerate launch --config_file=config.yaml train_tdd.py \
     --num_inference_steps_min=4 \
     --num_inference_steps_max=8 \
     --s_ratio=0.3 \
-
-# cd /mnt/nj-aigc/usr/polu
-# bash run_gpu.sh
