@@ -62,7 +62,7 @@ from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 from dataset import SDXLText2ImageDataset
-
+from scheduler import TDDScheduler
 
 MAX_SEQ_LENGTH = 77
 
@@ -108,7 +108,7 @@ def log_validation(
         text_encoder_2 = text_encoder_two,
         tokenizer = tokenizer_one,
         tokenizer_2 = tokenizer_two,
-        scheduler=TCDScheduler.from_pretrained(args.pretrained_teacher_model, subfolder="scheduler"),
+        scheduler=TDDScheduler.from_config(args.pretrained_teacher_model, subfolder="scheduler", algorithm_type="dpmsolver++", solver_order=1, tdd_train_step=args.num_ddim_timesteps),
         revision=args.revision,
         torch_dtype=weight_dtype,
     )
@@ -1359,15 +1359,15 @@ def main(args):
                             encoder_hidden_states=prompt_embeds.float(),
                             added_cond_kwargs=encoded_text,
                         ).sample
-                        pred_x_0 = predicted_origin(
-                            target_noise_pred,
-                            timesteps,
-                            x_prev,
-                            noise_scheduler.config.prediction_type,
-                            alpha_schedule,
-                            sigma_schedule,
-                        )
-                        target = solver.tdd_step(pred_x_0, target_noise_pred, timesteps_s)
+                    pred_x_0 = predicted_origin(
+                        target_noise_pred,
+                        timesteps,
+                        x_prev,
+                        noise_scheduler.config.prediction_type,
+                        alpha_schedule,
+                        sigma_schedule,
+                    )
+                    target = solver.tdd_step(pred_x_0, target_noise_pred, timesteps_s)
 
                 # 20.4.13. Calculate loss
                 if args.loss_type == "l2":
