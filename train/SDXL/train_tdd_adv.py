@@ -63,7 +63,7 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 from dataset import SDXLText2ImageDataset
 from pcm_discriminator_sdxl import Discriminator
-from scheduler import TDDSchedulerPlus
+from scheduler import TDDScheduler
 
 MAX_SEQ_LENGTH = 77
 
@@ -109,7 +109,7 @@ def log_validation(
         text_encoder_2 = text_encoder_two,
         tokenizer = tokenizer_one,
         tokenizer_2 = tokenizer_two,
-        scheduler=TDDSchedulerPlus.from_config(args.pretrained_teacher_model, subfolder="scheduler", algorithm_type="dpmsolver++", solver_order=1, tdd_train_step=args.num_ddim_timesteps),
+        scheduler=TDDScheduler.from_config(args.pretrained_teacher_model, subfolder="scheduler", algorithm_type="dpmsolver++", solver_order=1, tdd_train_step=args.num_ddim_timesteps),
         revision=args.revision,
         torch_dtype=weight_dtype,
     )
@@ -1461,12 +1461,8 @@ def main(args):
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
                             checkpoints = os.listdir(args.output_dir)
-                            checkpoints = [
-                                d for d in checkpoints if d.startswith("checkpoint")
-                            ]
-                            checkpoints = sorted(
-                                checkpoints, key=lambda x: int(x.split("-")[1])
-                            )
+                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
+                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
 
                             # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
                             if len(checkpoints) >= args.checkpoints_total_limit:
@@ -1494,17 +1490,9 @@ def main(args):
                     if global_step % args.validation_steps == 0:
                         log_validation(vae, unet, text_encoder_one, text_encoder_two, tokenizer_one, tokenizer_two, args, accelerator, weight_dtype, global_step,
                             1,
-                            args.multiphase,
+                            args.val_infer_step,
                         )
-                        log_validation(vae, unet, text_encoder_one, text_encoder_two, tokenizer_one, tokenizer_two, args, accelerator, weight_dtype, global_step,
-                            2.0,
-                            args.multiphase,
-                        )
-                        if args.not_apply_cfg_solver:
-                            log_validation(vae, unet, text_encoder_one, text_encoder_two, tokenizer_one, tokenizer_two, args, accelerator, weight_dtype, global_step,
-                                7.5,
-                                args.multiphase,
-                            )
+
                 if (global_step - 1) % 2 == 0:
                     logs = {
                         "d_loss": loss.detach().item(),
