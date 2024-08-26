@@ -30,6 +30,3 @@ accelerate launch --config_file=config.yaml train_tdd_adv.py \
     --s_ratio=0.3 \
     --adv_lr=1e-5 \
     --adv_weight=0.1 \
-
-# cd /mnt/nj-aigc/usr/polu
-# bash run_gpu.sh
