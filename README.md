@@ -98,9 +98,6 @@ Target-Driven Distillation (TDD) features three key designs, that differ from pr
 </div>
 
 For further details of TDD, please refer to our paper
-> **Target-Driven Distillation: Consistency Distillation with Target Timestep Selection and Decoupled Guidance**<br>
-> Cunzheng Wang, Ziyuan Guo, Yuxuan Duan, Huaxia Li, Nemo Chen, Xu Tang, Yao Hu<br>
->
 > [![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org)<br>
 
 
