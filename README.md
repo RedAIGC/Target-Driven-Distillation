@@ -31,7 +31,7 @@ git clone https://github.com/RedAIGC/Target-Driven-Distillation.git
 cd Target-Driven-Distillation
 ```
 
-- Download pretrained models with the script below or from [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RedAIGC/TDD).
+- Download pretrained models with the script below or from [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD).
 ```python
 from huggingface_hub import hf_hub_download
 hf_hub_download(repo_id="RedAIGC/TDD", filename="sdxl_tdd_lora_weights.safetensors", local_dir="./tdd_lora")
