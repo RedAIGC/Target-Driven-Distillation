@@ -4,7 +4,7 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org)
 [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD)
-[[Project Page]](https://redaigc.github.io/TDD)
+[![Page](https://img.shields.io/static/v1?label=OfficialWebsite&message=Page&color=green)](https://redaigc.github.io/TDD)
 
 </div>
 
