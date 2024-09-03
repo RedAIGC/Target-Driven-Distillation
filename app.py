@@ -8,7 +8,7 @@ from PIL import Image
 import transformers
 transformers.utils.move_cache()
 
-SAFETY_CHECKER = False
+SAFETY_CHECKER = True
 
 loaded_acc = None
 device = "cuda"
@@ -167,7 +167,7 @@ Target-Driven Distillation (TDD) is a state-of-the-art consistency distillation 
                         label="eta",
                         minimum=0,
                         maximum=0.3,
-                        step=0.1,
+                        step=0.01,
                         value=0.2,
                     )
                 with gr.Row():
@@ -194,8 +194,9 @@ Target-Driven Distillation (TDD) is a state-of-the-art consistency distillation 
     gr.Examples(
         examples=[
             ["A photo of a cat made of water.", "", "SDXL-1.0", "TDD_adv", 4, 1.7, 0.2, 546237],
-            ["A photo of a dog made of water.", "", "SDXL-1.0", "TDD_adv", 4, 1.7, 0.2, 546237],
-
+            ["Astronaut in a jungle, cold color palette, muted colors, detailed, 8k", "NSFW, low quality, low resolution, normal quality", "Real", "TDD_adv", 7, 2.0, 0.3, 68436]
+            ["panda mad scientist mixing sparkling chemicals", "", "Real", "TDD_adv", 5, 1.7, 0.2, 3853],
+            ["a dog in snow, 8k", "", "SDXL-1.0", "TDD", 6, 1.3, 0.2, 12138]
         ],
         inputs=[prompt, negative_prompt, ckpt, acc, steps, guidance_scale, eta, seed],
         outputs=[img],
