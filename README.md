@@ -100,6 +100,9 @@ Target-Driven Distillation (TDD) features three key designs, that differ from pr
 
 For further details of TDD, please refer to our paper: [![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org).
 
+## Acknowledgements
+- Thanks to the [PCM](https://github.com/G-U-N/Phased-Consistency-Model) PCM team for their ADV_loss support!
+- Thanks to the [HuggingFace](https://github.com/huggingface) gradio team for their free GPU support!
 
 
 ## Concact, Collaboration, and Citation
