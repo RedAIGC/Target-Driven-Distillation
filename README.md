@@ -2,7 +2,7 @@
 
 # ✨Target-Driven Distillation✨
 
-[![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org)
+[![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org/abs/2409.01347)
 [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD)
 [![Page](https://img.shields.io/static/v1?label=OfficialWebsite&message=Page&color=green)](https://redaigc.github.io/TDD)
 
@@ -20,6 +20,7 @@ Target-Driven Distillation (TDD) is a state-of-the-art consistency distillation 
 
 ## News
 
+- **Sept. 4, 2024**: Our detailed research paper is now on arXiv.
 - **Aug. 29, 2024**: We have released codes for training and inference, as well as the pretrained models both w/ and w/o adv, on SDXL.
 - **Aug. 22, 2024**: Project launched.
 
