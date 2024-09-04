@@ -2,9 +2,10 @@
 
 # ✨Target-Driven Distillation✨
 
-[![arXiv](https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg?logo=arxiv)](https://arxiv.org/abs/2409.01347)
-[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD)
-[![Page](https://img.shields.io/static/v1?label=OfficialWebsite&message=Page&color=green)](https://redaigc.github.io/TDD)
+[![Arxiv](https://img.shields.io/badge/arXiv-2402.19159-b31b1b)](https://arxiv.org/abs/2409.01347)
+[![Project page](https://img.shields.io/badge/Web-Project%20Page-green)](https://redaigc.github.io/TDD)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97HuggingFace-Model-purple)](https://huggingface.co/RED-AIGC/TDD)
+[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97HuggingFace-Space-blue)](https://huggingface.co/spaces/RED-AIGC/TDD)
 
 </div>
 
