@@ -118,6 +118,7 @@ For further details of TDD, please refer to our paper: [![Arxiv](https://img.shi
 If you have any questions about the code, please do not hesitate to contact me!
 
 Email: polu@xiaohongshu.com
+Email: wangcunzheng2000@163.com
 
 <!-- If you find TDD helpful to your research, please cite our paper:
 ```
