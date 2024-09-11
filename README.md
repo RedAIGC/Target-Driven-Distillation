@@ -5,7 +5,8 @@
 [![Arxiv](https://img.shields.io/badge/arXiv-2402.19159-b31b1b)](https://arxiv.org/abs/2409.01347)
 [![Project page](https://img.shields.io/badge/Web-Project%20Page-green)](https://redaigc.github.io/TDD)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97HuggingFace-Model-purple)](https://huggingface.co/RED-AIGC/TDD)
-[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97HuggingFace-Space-blue)](https://huggingface.co/spaces/RED-AIGC/TDD)
+[![Hugging Face Space SDXL](https://img.shields.io/badge/%F0%9F%A4%97HF%20Space-SDXL-blue)](https://huggingface.co/spaces/RED-AIGC/TDD)
+[![Hugging Face Space SVD](https://img.shields.io/badge/%F0%9F%A4%97HF%20Space-SVD-blue)](https://huggingface.co/spaces/RED-AIGC/SVD-TDD)
 
 </div>
 
