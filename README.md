@@ -119,7 +119,7 @@ For further details of TDD, please refer to our paper: [![Arxiv](https://img.shi
 - Thanks to the [HuggingFace](https://github.com/huggingface) gradio team for their free GPU support!
 
 
-## Concact, Collaboration, and Citation
+## Concact, Collaboration, and Citation![visitors](https://visitor-badge.laobi.icu/badge?page_id=RedAIGC.Target-Driven-Distillation)
 
 If you have any questions about the code, please do not hesitate to contact me!
 
