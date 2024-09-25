@@ -40,7 +40,28 @@ git clone https://github.com/RedAIGC/Target-Driven-Distillation.git
 cd Target-Driven-Distillation
 ```
 
-- Download pretrained models with the script below or from [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD).
+- FLUX Download pretrained models with the script below or from [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD).
+```python
+from huggingface_hub import hf_hub_download
+from diffusers import FluxPipeline
+
+pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
+pipe.load_lora_weights(hf_hub_download("RED-AIGC/TDD", "TDD-FLUX.1-dev-lora-beta.safetensors"))
+pipe.fuse_lora(lora_scale=0.125)
+pipe.to("cuda")
+
+image_flux = pipe(
+    prompt=[prompt],
+    generator=torch.Generator().manual_seed(int(3413)),
+    num_inference_steps=8,
+    guidance_scale=2.0,
+    height=1024,
+    width=1024,
+    max_sequence_length=256
+).images[0]
+```
+
+- SDXL Download pretrained models with the script below or from [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-blue)](https://huggingface.co/RED-AIGC/TDD).
 ```python
 from huggingface_hub import hf_hub_download
 hf_hub_download(repo_id="RedAIGC/TDD", filename="sdxl_tdd_lora_weights.safetensors", local_dir="./tdd_lora")
