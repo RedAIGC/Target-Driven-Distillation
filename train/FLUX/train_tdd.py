@@ -68,6 +68,7 @@ from diffusers.utils import (
 )
 from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_card
 from diffusers.utils.torch_utils import is_compiled_module
+from diffusers.utils.import_utils import is_xformers_available
 from dataset import SDXLText2ImageDataset
 
 
@@ -499,6 +500,11 @@ def parse_args():
         help="Whether or not to use 8-bit Adam from bitsandbytes.",
     )
     parser.add_argument(
+        "--set_grad_to_none",
+        action="store_true",
+        help="Whether or not to delete the gradients when calling optimizer.zero_grad().",
+    )
+    parser.add_argument(
         "--adam_beta1",
         type=float,
         default=0.9,
@@ -636,6 +642,12 @@ def parse_args():
         "--gradient_checkpointing",
         action="store_true",
         help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
+    )
+    # ----Using xformers----
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention",
+        action="store_true",
+        help="Whether or not to use xformers.",
     )
     # ----Distributed Training----
     parser.add_argument(
@@ -912,13 +924,13 @@ def main(args):
     )
 
     # 6. Load teacher transformer from FLUX checkpoint
-    teacher_transformer = FluxTransformer2DModel.from_pretrained(
-        args.pretrained_teacher_model, subfolder="transformer", revision=args.teacher_revision
-    )
+    # teacher_transformer = FluxTransformer2DModel.from_pretrained(
+    #     args.pretrained_teacher_model, subfolder="transformer", revision=args.teacher_revision
+    # )
 
     # 7. Freeze teacher vae, text_encoders, transformer and teacher_transformer
     transformer.requires_grad_(False)
-    teacher_transformer.requires_grad_(False)
+    # teacher_transformer.requires_grad_(False)
     vae.requires_grad_(False)
     text_encoder_one.requires_grad_(False)
     text_encoder_two.requires_grad_(False)
@@ -940,7 +952,7 @@ def main(args):
 
     vae.to(accelerator.device, dtype=torch.float32)
     transformer.to(accelerator.device, dtype=weight_dtype)
-    teacher_transformer.to(accelerator.device, dtype=weight_dtype)
+    # teacher_transformer.to(accelerator.device, dtype=weight_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
     #print(noise_scheduler.config.num_train_timesteps)
@@ -953,12 +965,6 @@ def main(args):
     print(solver.merged_timesteps)
     solver.to(accelerator.device)
 
-    # not available yet
-    # transformer.enable_xformers_memory_efficient_attention()
-    # teacher_transformer.enable_xformers_memory_efficient_attention()
-    if args.gradient_checkpointing:
-        transformer.enable_gradient_checkpointing()
-
     # 9. Add LoRA to the student Transformer, only the LoRA projection matrix will be updated by the optimizer.
     transformer_lora_config = LoraConfig(
         r=args.lora_rank,
@@ -968,8 +974,41 @@ def main(args):
             "proj_out",
             "ff.net.0.proj",
             "ff.net.2"],
+        # target_modules=[
+        #     "to_k", "to_q", "to_v", "to_out.0",
+        #     "proj_in",
+        #     "proj_out",
+        #     "ff.net.0.proj",
+        #     "ff.net.2",
+        #     # new
+        #     "context_embedder", "x_embedder",
+        #     "linear", "linear_1", "linear_2",
+        #     "proj_mlp",
+        #     "add_k_proj", "add_q_proj", "add_v_proj", "to_add_out",
+        #     "ff_context.net.0.proj", "ff_context.net.2"],
     )
     transformer.add_adapter(transformer_lora_config)
+
+    # may not be available yet
+    if args.enable_xformers_memory_efficient_attention:
+        if is_xformers_available():
+            import xformers
+            xformers_version = version.parse(xformers.__version__)
+            if xformers_version == version.parse("0.0.16"):
+                logger.warn(
+                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
+                )
+            if xformers_version < version.parse("0.0.27"):
+                logger.warn("the code may get stuck with the currently installed version of xformers, it is recommended to install a newer version (>= 0.0.27)")
+
+            transformer.enable_xformers_memory_efficient_attention()
+            # teacher_transformer.enable_xformers_memory_efficient_attention()
+        else:
+            raise ValueError(
+                "xformers is not available. Make sure it is installed correctly")
+        
+    if args.gradient_checkpointing:
+        transformer.enable_gradient_checkpointing()
 
     # 10. Handle saving and loading of checkpoints
     def unwrap_model(model):
@@ -1303,7 +1342,22 @@ def main(args):
 
                 with torch.no_grad():
                     with torch.autocast("cuda"):
-                        teacher_model_pred = teacher_transformer(
+                        # teacher_model_pred = teacher_transformer(
+                        #     hidden_states=packed_noisy_model_input.float(),
+                        #     # YiYi notes: divide it by 1000 for now because we scale it by 1000 in the transforme rmodel (we should not keep it but I want to keep the inputs same for the model for testing)
+                        #     timestep=timesteps / 1000,
+                        #     guidance=guidance,
+                        #     pooled_projections=pooled_prompt_embeds.float(),
+                        #     encoder_hidden_states=prompt_embeds.float(),
+                        #     txt_ids=text_ids.float(),
+                        #     img_ids=latent_image_ids.float(),
+                        #     return_dict=False,
+                        # )[0]
+                        
+                        # use a single model to save VRAM
+                        unwrapped_transformer = accelerator.unwrap_model(transformer)
+                        unwrapped_transformer.disable_adapters()
+                        teacher_model_pred = unwrapped_transformer(
                             hidden_states=packed_noisy_model_input.float(),
                             # YiYi notes: divide it by 1000 for now because we scale it by 1000 in the transforme rmodel (we should not keep it but I want to keep the inputs same for the model for testing)
                             timestep=timesteps / 1000,
@@ -1314,6 +1368,8 @@ def main(args):
                             img_ids=latent_image_ids.float(),
                             return_dict=False,
                         )[0]
+                        unwrapped_transformer.enable_adapters()
+
                         x_prev = solver.euler_step(packed_noisy_model_input, teacher_model_pred, index)
                         # teacher_model_pred = FluxPipeline._unpack_latents(
                         #     teacher_model_pred,
@@ -1356,7 +1412,7 @@ def main(args):
                     accelerator.clip_grad_norm_(transformer_lora_parameters, args.max_grad_norm)
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none = args.set_grad_to_none)
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
