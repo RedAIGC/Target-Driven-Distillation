@@ -552,6 +552,12 @@ def parse_args():
         "Ignored if optimizer is adamW",
     )
     parser.add_argument(
+        "--ademamix_alpha",
+        type=float,
+        default=5.0,
+        help="Alpha value for the ademamix optimizer.",
+    )
+    parser.add_argument(
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
     )
     # ----Diffusion Training Arguments----
@@ -1117,7 +1123,7 @@ def main(args):
                     "To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
                 )
 
-            optimizer_class = bnb.optim.AdamW8bit
+            optimizer_class = bnb.optim.PagedAdamW8bit
         else:
             optimizer_class = torch.optim.AdamW
 
@@ -1151,6 +1157,24 @@ def main(args):
             decouple=args.prodigy_decouple,
             use_bias_correction=args.prodigy_use_bias_correction,
             safeguard_warmup=args.prodigy_safeguard_warmup,
+        )
+
+    if args.optimizer.lower() == "AdEMAMix8bit":
+        try:
+            import bitsandbytes as bnb
+        except ImportError:
+            raise ImportError(
+                "To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
+            )
+
+        optimizer_class = bnb.optim.PagedAdEMAMix8bit
+
+        optimizer = optimizer_class(
+            params_to_optimize,
+            betas=(args.adam_beta1, args.adam_beta2, args.prodigy_beta3 if args.prodigy_beta3 is not None else 0.9999),
+            alpha=args.ademamix_alpha,
+            weight_decay=args.adam_weight_decay,
+            eps=args.adam_epsilon,
         )
 
     # 13. Dataset creation and data processing
