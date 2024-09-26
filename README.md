@@ -136,6 +136,7 @@ https://github.com/user-attachments/assets/09fcfc83-fbb8-45da-8ecf-18fa11a6bf82
 For further details of TDD, please refer to our paper: [![Arxiv](https://img.shields.io/badge/arXiv-2402.19159-b31b1b)](https://arxiv.org/abs/2409.01347).
 
 ## Acknowledgements
+- Thanks [sdbds](https://github.com/sdbds) help us in the training flux!
 - Thanks to the [PCM](https://github.com/G-U-N/Phased-Consistency-Model) PCM team for their ADV_loss support!
 - Thanks to the [HuggingFace](https://github.com/huggingface) gradio team for their free GPU support!
 
