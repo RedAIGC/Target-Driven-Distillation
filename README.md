@@ -133,7 +133,8 @@ Target-Driven Distillation (TDD) features three key designs, that differ from pr
 For further details of TDD, please refer to our paper: [![Arxiv](https://img.shields.io/badge/arXiv-2402.19159-b31b1b)](https://arxiv.org/abs/2409.01347).
 
 ## Acknowledgements
-- Thanks [sdbds](https://github.com/sdbds) help us in the training flux!
+- Thanks [sdbds](https://github.com/sdbds) help us in the training FLUX, This allows us to distill FLUX with a larger batch size.
+- Thanks [PSNbst](https://huggingface.co/PSNbst/PAseer-TDD-Accelerator) provide the compressed version of TDD, which is less than 20MB. Truly impressive.
 - Thanks to the [PCM](https://github.com/G-U-N/Phased-Consistency-Model) PCM team for their ADV_loss support!
 - Thanks to the [HuggingFace](https://github.com/huggingface) gradio team for their free GPU support!
 
