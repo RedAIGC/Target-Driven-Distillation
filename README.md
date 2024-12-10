@@ -21,8 +21,9 @@ Target-Driven Distillation (TDD) is a state-of-the-art consistency distillation 
 
 
 
-## News
+## News!
 
+- **Dec. 10, 2024**: Our paper is accepted by **AAAI25**!
 - **Sept. 21, 2024**: Demo of FLUX-TDD-BETA(4-8-steps) is now available on Hugging Face [![Hugging Face Space FLUX](https://img.shields.io/badge/%F0%9F%A4%97HF%20Space-FLUX-blue)](https://huggingface.co/spaces/RED-AIGC/FLUX-TDD-BETA)
 - **Sept. 20, 2024**: We have released codes for training on [FLUX](https://github.com/RedAIGC/Target-Driven-Distillation/tree/main/train/FLUX) , Our 4-8-steps FLUX.1-dev-related LoRAs are coming soon!
 - **Sept. 12, 2024**: Demos of TDD-SDXL and TDD-SVD are now available on Hugging Face [![Hugging Face Space SDXL](https://img.shields.io/badge/%F0%9F%A4%97HF%20Space-SDXL-blue)](https://huggingface.co/spaces/RED-AIGC/TDD)
