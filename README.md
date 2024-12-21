@@ -62,7 +62,7 @@ from huggingface_hub import hf_hub_download
 from diffusers import FluxPipeline
 
 pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
-pipe.load_lora_weights(hf_hub_download("RED-AIGC/TDD", "TDD-FLUX.1-dev-lora-beta.safetensors"))
+pipe.load_lora_weights(hf_hub_download("RED-AIGC/TDD", "FLUX.1-dev_tdd_lora_weights.safetensors"))
 pipe.fuse_lora(lora_scale=0.125)
 pipe.to("cuda")
 
